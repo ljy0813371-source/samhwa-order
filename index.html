@@ -173,6 +173,12 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   padding: 4px;
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  var SUPA_URL = 'https://twgiucbkczlkmwasxbfs.supabase.co';
+  var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3Z2l1Y2JrY3psa213YXN4YmZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyOTMyNzYsImV4cCI6MjEwMDg2OTI3Nn0.RgTXH6xKqWotDQU_5n4uayPojS9fo8yXJWmn_ehq948';
+  var supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+</script>
 </head>
 <body>
 
@@ -186,7 +192,7 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   </div>
   <div class="sidebar-section">메뉴</div>
   <div class="nav-item active" onclick="showTab('order',this)"><span class="nav-icon">📋</span><span>발주 신청</span></div>
-  <div class="nav-item" onclick="showTab('status',this)"><span class="nav-icon">📊</span><span>발주 현황</span></div>
+      <div class="nav-item" id="nav-mystatus" onclick="showTab('mystatus',this)"><span class="nav-icon">📌</span><span>발주 현황</span></div>
   <div class="nav-item" onclick="showTab('approve',this)"><span class="nav-icon">✅</span><span>승인 대기함</span></div>
   <div class="nav-item" onclick="showTab('history',this)"><span class="nav-icon">📂</span><span>구매 이력</span></div>
   <div class="nav-item" onclick="showTab('dashboard',this)"><span class="nav-icon">📊</span><span>대시보드</span></div>
@@ -1024,14 +1030,14 @@ textarea.form-control { resize: vertical; min-height: 70px; }
           </div>
         </div>
       </div>
+
     </div>
 
-    
-    <div id="tab-status" class="tab-pane">
+    <div id="tab-mystatus" class="tab-pane">
       <div class="card">
         <div class="card-header">
           <span class="card-title">발주 현황</span>
-          <button class="btn btn-secondary btn-sm" onclick="loadStatusOrders()" style="margin-left:auto;">새로고침</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadMyStatus()" style="margin-left:auto;">새로고침</button>
         </div>
         <div class="card-body" style="padding:0;">
           <table class="tbl" style="width:100%">
@@ -1046,18 +1052,18 @@ textarea.form-control { resize: vertical; min-height: 70px; }
                 <th>사용부서</th>
                 <th>거래업체</th>
                 <th>비고</th>
-                <th id="statusColHeader" style="display:none;">상태</th>
+                <th id="mystatusStatusHeader">상태</th>
               </tr>
             </thead>
-            <tbody id="statusOrdersTbody">
-              <tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">발주 신청 내역이 없습니다</td></tr>
+            <tbody id="myStatusTbody">
+              <tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">데이터를 불러오는 중...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </div>
 
-<div id="tab-approve" class="tab-pane">
+    <div id="tab-approve" class="tab-pane">
       <div class="notice-bar">⚠️ 승인 시 신청자 알림 발송은 전산 계열사 협의 후 배포 시 활성화됩니다.</div>
       <div id="approveList">
         <div style="text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px;border:1px solid #e0e0e8;">
@@ -1264,7 +1270,7 @@ var modalCallback = null;
 // ── 탭 전환 ────────────────────────────────────────────
 var tabTitles = {
   'order': '발주 신청',
-  'status': '발주 현황',
+  'mystatus': '발주 현황',
   'approve': '승인 대기함',
   'history': '구매 이력',
   'dashboard': '대시보드',
@@ -1307,8 +1313,8 @@ function showTab(name, el) {
     applyFilter();
   }
   if (name === 'dashboard') { renderDashboard(); }
-  if (name === 'approve') { renderApproveList(); }
-  if (name === 'status') { loadStatusOrders(); }
+  if (name === 'approve') { loadApproveList(); }
+  if (name === 'mystatus') { loadMyStatus(); }
   if (name === 'admin' || name === 'somo' || name === 'vendor') { renderAdminTables(); }
 }
 
@@ -1320,7 +1326,7 @@ function resetOrderForm() {
   });
 }
 
-function submitOrder() {
+async function submitOrder() {
   var name = document.getElementById('ord_name').value.trim();
   var dept = document.getElementById('ord_dept').value;
   var item = document.getElementById('ord_item').value.trim();
@@ -1330,7 +1336,6 @@ function submitOrder() {
     return;
   }
   var order = {
-    id: Date.now(),
     datetime: new Date().toLocaleString('ko-KR'),
     name: name,
     dept: dept,
@@ -1339,19 +1344,18 @@ function submitOrder() {
     spec: document.getElementById('ord_spec').value.trim(),
     qty: qty,
     unit: document.getElementById('ord_unit').value.trim(),
-    note: document.getElementById('ord_note').value.trim(),
-    status: 'wait'
+    note: document.getElementById('ord_note').value.trim()
   };
-  pendingOrders.unshift(order);
-  myOrders.unshift(order);
-  updateNotifBadge();
-  renderApproveList();
-  var statusTab = document.getElementById('tab-status');
-  if (statusTab && statusTab.classList.contains('active')) {
-    loadStatusOrders();
+
+  showToast('신청 중...');
+  var result = await submitOrderToSupabase(order);
+  if (result) {
+    resetOrderForm();
+    loadApproveList();
+    showToast('발주 신청이 완료되었습니다. 담당자 승인 대기 중입니다.');
+  } else {
+    showToast('저장 중 오류가 발생했습니다. 네트워크를 확인해주세요.');
   }
-  resetOrderForm();
-  showToast('발주 신청이 완료되었습니다. 담당자 승인 대기 중입니다.');
 }
 
 function renderMyOrders() {
@@ -1401,8 +1405,8 @@ function renderApproveList() {
           + '<div></div>'
           + '</div>'
           + '<div class="approve-card-actions">'
-          + '<button class="btn btn-success btn-sm" onclick="approveOrder(' + JSON.stringify(o.id) + ')">승인</button>'
-          + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(' + JSON.stringify(o.id) + ')">반려</button>'
+          + '<button class="btn btn-success btn-sm" onclick="approveOrder(' + o.id + ')">승인</button>'
+          + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(' + o.id + ')">반려</button>'
           + '</div></div>';
   });
   container.innerHTML = html;
@@ -1414,8 +1418,8 @@ function approveOrder(id) {
     order.status = 'ok';
     updateNotifBadge();
     renderApproveList();
-    loadStatusOrders();
-    showToast('승인 처리되었습니다.');
+    renderMyOrders();
+    showToast('승인 처리되었습니다. (실제 알림: 배포 시 활성화)');
     var kpi4 = document.getElementById('kpi4');
     if (kpi4) kpi4.textContent = String(pendingOrders.filter(function(o){ return o.status === 'wait'; }).length);
   }
@@ -1431,7 +1435,7 @@ function openRejectModal(id) {
       order.rejectReason = reason;
       updateNotifBadge();
       renderApproveList();
-      loadStatusOrders();
+      renderMyOrders();
       showToast('반려 처리되었습니다.');
     }
     closeModal();
@@ -1446,48 +1450,6 @@ function closeModal() {
 
 function confirmModal() {
   if (modalCallback) modalCallback();
-}
-
-// ── 발주 현황 탭 ────────────────────────────────────────
-function loadStatusOrders() {
-  var tbody = document.getElementById('statusOrdersTbody');
-  var colHeader = document.getElementById('statusColHeader');
-  if (!tbody) return;
-
-  // 담당자/관리자이면 상태 컬럼 표시
-  var showStatus = (currentRole === 'approver' || currentRole === 'admin');
-  if (colHeader) colHeader.style.display = showStatus ? '' : 'none';
-
-  var allList = pendingOrders;
-  if (allList.length === 0) {
-    var colspan = showStatus ? 10 : 9;
-    tbody.innerHTML = '<tr><td colspan="' + colspan + '" style="text-align:center;padding:20px;color:#999;">발주 신청 내역이 없습니다</td></tr>';
-    return;
-  }
-
-  var html = '';
-  allList.forEach(function(o) {
-    var statusCell = '';
-    if (showStatus) {
-      var badge = o.status === 'wait' ? '<span class="badge badge-wait">승인대기</span>'
-                : o.status === 'ok'   ? '<span class="badge badge-ok">승인완료</span>'
-                :                       '<span class="badge badge-no">반려</span>';
-      statusCell = '<td>' + badge + '</td>';
-    }
-    html += '<tr>'
-          + '<td>' + (o.datetime || '-') + '</td>'
-          + '<td>' + esc(o.name || '') + '</td>'
-          + '<td>' + esc(o.item || '') + '</td>'
-          + '<td>' + esc(o.spec || '') + '</td>'
-          + '<td>' + esc(String(o.qty || '')) + '</td>'
-          + '<td>' + esc(o.unit || '') + '</td>'
-          + '<td>' + esc(o.dept || '') + '</td>'
-          + '<td>' + esc(o.vendor || '') + '</td>'
-          + '<td>' + esc(o.note || '') + '</td>'
-          + statusCell
-          + '</tr>';
-  });
-  tbody.innerHTML = html;
 }
 
 // ── 구매 이력 ───────────────────────────────────────────
@@ -1957,19 +1919,17 @@ function changeRole(role) {
   var addBtn = document.getElementById('histAddRowBtn');
   if (addBtn) addBtn.style.display = (role === 'approver' || role === 'admin') ? '' : 'none';
 
+  // 승인 대기함 메뉴: 신청자에게 숨김
+  var approveNav = document.querySelector('[onclick*="showTab(\'approve\'"]');
+  if (approveNav) approveNav.style.display = (role === 'approver' || role === 'admin') ? '' : 'none';
+
+  // 발주 현황 탭이 활성화 상태면 다시 로드 (상태 컬럼 표시 여부 반영)
+  var myStatusTab = document.getElementById('tab-mystatus');
+  if (myStatusTab && myStatusTab.classList.contains('active')) {
+    loadMyStatus();
+  }
+
   showToast(role === 'admin' ? '관리자 모드' : role === 'approver' ? '담당자 모드' : '신청자 모드');
-
-  // 발주 현황 탭이 열려있으면 상태 컬럼 갱신
-  var statusTab = document.getElementById('tab-status');
-  if (statusTab && statusTab.classList.contains('active')) {
-    loadStatusOrders();
-  }
-
-  // 담당자/관리자이면 승인 대기함 표시, 신청자이면 숨김
-  var approveNav = document.querySelector('.nav-item[onclick*="approve"]');
-  if (approveNav) {
-    approveNav.style.display = (role === 'approver' || role === 'admin') ? '' : 'none';
-  }
 }
 
 // ── 유틸 ────────────────────────────────────────────────
@@ -2055,17 +2015,206 @@ function addHistoryRow() {
 }
 
 // ── 초기화 ──────────────────────────────────────────────
+// ── Supabase 연동 함수들 ─────────────────────────────────────
+
+// 발주 신청 → Supabase 저장
+async function submitOrderToSupabase(order) {
+  try {
+    var { data, error } = await supabase
+      .from('pending_orders')
+      .insert([{
+        applicant:    order.name,
+        department:   order.dept,
+        request_date: order.datetime,
+        item:         order.item,
+        spec:         order.spec,
+        quantity:     parseInt(order.qty) || 0,
+        unit:         order.unit,
+        vendor:       order.vendor,
+        note:         order.note,
+        status:       '대기',
+        category:     '소모품비'
+      }])
+      .select();
+    if (error) throw error;
+    return data && data[0] ? data[0] : null;
+  } catch(e) {
+    console.error('Supabase 저장 오류:', e);
+    return null;
+  }
+}
+
+// Supabase에서 발주 목록 불러오기
+async function loadPendingOrdersFromSupabase() {
+  try {
+    var { data, error } = await supabase
+      .from('pending_orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch(e) {
+    console.error('Supabase 불러오기 오류:', e);
+    return [];
+  }
+}
+
+// 승인 처리 → Supabase 업데이트
+async function approveOrderInSupabase(id) {
+  try {
+    var { error } = await supabase
+      .from('pending_orders')
+      .update({ status: '승인' })
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch(e) {
+    console.error('승인 오류:', e);
+    return false;
+  }
+}
+
+// 반려 처리 → Supabase 업데이트
+async function rejectOrderInSupabase(id, reason) {
+  try {
+    var { error } = await supabase
+      .from('pending_orders')
+      .update({ status: '반려', reject_reason: reason })
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch(e) {
+    console.error('반려 오류:', e);
+    return false;
+  }
+}
+
+// 발주 현황 탭 렌더링
+async function loadMyStatus() {
+  var tbody = document.getElementById('myStatusTbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">불러오는 중...</td></tr>';
+
+  var orders = await loadPendingOrdersFromSupabase();
+
+  // 상태 컬럼 헤더 표시 여부
+  var headerEl = document.getElementById('mystatusStatusHeader');
+  var showStatus = (currentRole === 'approver' || currentRole === 'admin');
+  if (headerEl) headerEl.style.display = showStatus ? '' : 'none';
+
+  if (!orders || orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">신청된 발주가 없습니다</td></tr>';
+    return;
+  }
+
+  var html = '';
+  orders.forEach(function(o) {
+    var statusBadge = '';
+    if (showStatus) {
+      if (o.status === '대기') {
+        statusBadge = '<span class="badge badge-wait">승인대기</span>';
+      } else if (o.status === '승인') {
+        statusBadge = '<span class="badge badge-ok">승인완료</span>';
+      } else if (o.status === '반려') {
+        statusBadge = '<span class="badge badge-ng">반려</span>' + (o.reject_reason ? '<br><small style="color:#999;">' + esc(o.reject_reason) + '</small>' : '');
+      }
+    }
+    html += '<tr>'
+          + '<td>' + esc(o.request_date || '') + '</td>'
+          + '<td>' + esc(o.applicant || '') + '</td>'
+          + '<td>' + esc(o.item || '') + '</td>'
+          + '<td>' + esc(o.spec || '') + '</td>'
+          + '<td style="text-align:right;">' + esc(String(o.quantity || '')) + '</td>'
+          + '<td>' + esc(o.unit || '') + '</td>'
+          + '<td>' + esc(o.department || '') + '</td>'
+          + '<td>' + esc(o.vendor || '') + '</td>'
+          + '<td>' + esc(o.note || '') + '</td>'
+          + (showStatus ? '<td>' + statusBadge + '</td>' : '<td style="display:none;"></td>')
+          + '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+// 승인 대기함 렌더링 (Supabase 기반)
+async function loadApproveList() {
+  var container = document.getElementById('approveList');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">불러오는 중...</div>';
+
+  var orders = await loadPendingOrdersFromSupabase();
+  var waitList = orders.filter(function(o){ return o.status === '대기'; });
+
+  // 알림 배지 업데이트
+  var badge = document.getElementById('notifBadge');
+  if (badge) badge.textContent = waitList.length;
+  var kpi4 = document.getElementById('kpi4');
+  if (kpi4) kpi4.textContent = String(waitList.length);
+
+  if (waitList.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px;border:1px solid #e0e0e8;">대기 중인 발주 신청이 없습니다</div>';
+    return;
+  }
+
+  var html = '';
+  waitList.forEach(function(o) {
+    html += '<div class="approve-card">'
+          + '<div class="approve-card-header">'
+          + '<div><div class="approve-card-title">' + esc(o.item || '') + (o.spec ? ' (' + esc(o.spec) + ')' : '') + '</div>'
+          + '<div class="approve-card-meta">신청자: ' + esc(o.applicant || '') + ' | ' + esc(o.department || '') + ' | ' + esc(o.request_date || '') + '</div>'
+          + (o.vendor ? '<div class="approve-card-meta">거래업체: ' + esc(o.vendor) + '</div>' : '')
+          + '<div class="approve-card-meta">수량: ' + esc(String(o.quantity || '')) + ' ' + esc(o.unit || '') + (o.note ? ' | 비고: ' + esc(o.note) : '') + '</div>'
+          + '</div>'
+          + '<div style="display:flex;gap:8px;flex-shrink:0;">'
+          + '<button class="btn btn-success btn-sm" onclick="doApprove('' + o.id + '')">승인</button>'
+          + '<button class="btn btn-danger btn-sm" onclick="doReject('' + o.id + '')">반려</button>'
+          + '</div>'
+          + '</div>'
+          + '</div>';
+  });
+  container.innerHTML = html;
+}
+
+// 승인 버튼 클릭
+async function doApprove(id) {
+  if (!confirm('승인 처리하시겠습니까?')) return;
+  var ok = await approveOrderInSupabase(id);
+  if (ok) {
+    showToast('승인 처리되었습니다.');
+    loadApproveList();
+  } else {
+    showToast('오류가 발생했습니다. 다시 시도해주세요.');
+  }
+}
+
+// 반려 버튼 클릭
+async function doReject(id) {
+  var reason = prompt('반려 사유를 입력해주세요:');
+  if (reason === null) return;
+  var ok = await rejectOrderInSupabase(id, reason);
+  if (ok) {
+    showToast('반려 처리되었습니다.');
+    loadApproveList();
+  } else {
+    showToast('오류가 발생했습니다. 다시 시도해주세요.');
+  }
+}
+
+// ── 초기화 ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   var cat = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '';
   renderHistoryHeader(cat);
   applyFilter();
   updateNotifBadge();
+  loadApproveList();
 
-  // 신청자 기본 역할: 승인 대기함 숨기기
-  var approveNav = document.querySelector('.nav-item[onclick*="'approve'"]');
-  if (approveNav) {
-    approveNav.style.display = 'none';
-  }
+  // 5초마다 자동 갱신
+  setInterval(function() {
+    loadApproveList();
+    var mystatus = document.getElementById('tab-mystatus');
+    if (mystatus && mystatus.classList.contains('active')) {
+      loadMyStatus();
+    }
+  }, 5000);
 });
 </script>
 </body>
