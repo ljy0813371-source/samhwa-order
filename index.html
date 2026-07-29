@@ -173,6 +173,8 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   padding: 4px;
 }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -1234,7 +1236,90 @@ allRecords = allRecords.filter(function(r) { return r[12] !== '인터넷구매�
 internetRows.forEach(function(r) { allRecords.push(r); });
 
 // ── 발주 신청 데이터 ────────────────────────────────────
-var pendingOrders = [];
+var 
+// ── Supabase 초기화 ──────────────────────────────────────
+const SUPABASE_URL = 'https://twgiucbkczlkmwasxbfs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3Z2l1Y2JrY3psa213YXN4YmZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyOTMyNzYsImV4cCI6MjEwMDg2OTI3Nn0.RgTXH6xKqWotDQU_5n4uayPojS9fo8yXJWmn_ehq948';
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Supabase 발주 저장
+async function sbInsertOrder(order) {
+  try {
+    const { error } = await _sb.from('pending_orders').insert([{
+      order_number: String(order.id),
+      applicant: order.name,
+      department: order.dept,
+      request_date: order.datetime,
+      category: order.category || '',
+      vendor: order.vendor || '',
+      item: order.item,
+      spec: order.spec || '',
+      quantity: parseInt(order.qty) || 0,
+      unit: order.unit || '',
+      unit_price: parseInt(order.unitPrice) || 0,
+      amount: parseInt(order.amount) || 0,
+      note: order.note || '',
+      status: 'wait'
+    }]);
+    if (error) console.error('발주 저장 오류:', error);
+  } catch(e) { console.error(e); }
+}
+
+// Supabase 승인 처리
+async function sbApproveOrder(orderId) {
+  try {
+    const { error } = await _sb.from('pending_orders')
+      .update({ status: '승인' })
+      .eq('order_number', String(orderId));
+    if (error) console.error('승인 업데이트 오류:', error);
+  } catch(e) { console.error(e); }
+}
+
+// Supabase 반려 처리
+async function sbRejectOrder(orderId, reason) {
+  try {
+    const { error } = await _sb.from('pending_orders')
+      .update({ status: '반려', reject_reason: reason })
+      .eq('order_number', String(orderId));
+    if (error) console.error('반려 업데이트 오류:', error);
+  } catch(e) { console.error(e); }
+}
+
+// Supabase에서 발주 목록 불러오기
+async function sbLoadOrders() {
+  try {
+    const { data, error } = await _sb.from('pending_orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('발주 불러오기 오류:', error); return; }
+    if (data && data.length > 0) {
+      pendingOrders = data.map(function(row) {
+        return {
+          id: row.order_number,
+          datetime: row.request_date,
+          name: row.applicant,
+          dept: row.department,
+          vendor: row.vendor || '',
+          item: row.item,
+          spec: row.spec || '',
+          qty: String(row.quantity || ''),
+          unit: row.unit || '',
+          unitPrice: row.unit_price || 0,
+          amount: row.amount || 0,
+          note: row.note || '',
+          status: row.status === '승인' ? 'ok' : row.status === '반려' ? 'no' : 'wait',
+          rejectReason: row.reject_reason || ''
+        };
+      });
+      myOrders = pendingOrders.slice();
+      renderApproveList();
+      renderMyOrders();
+      updateNotifBadge();
+    }
+  } catch(e) { console.error(e); }
+}
+// ── Supabase 초기화 끝 ──────────────────────────────────
+pendingOrders = [];
 var myOrders = [];
 var modalCallback = null;
 
@@ -1319,6 +1404,7 @@ function submitOrder() {
   };
   pendingOrders.unshift(order);
   myOrders.unshift(order);
+  sbInsertOrder(order); // Supabase 저장
   updateNotifBadge();
   renderMyOrders();
   renderApproveList();
@@ -1384,10 +1470,11 @@ function approveOrder(id) {
   var order = pendingOrders.find(function(o){ return o.id === id; });
   if (order) {
     order.status = 'ok';
+    sbApproveOrder(id); // Supabase 업데이트
     updateNotifBadge();
     renderApproveList();
     renderMyOrders();
-    showToast('승인 처리되었습니다. (실제 알림: 배포 시 활성화)');
+    showToast('승인 처리되었습니다.');
     var kpi4 = document.getElementById('kpi4');
     if (kpi4) kpi4.textContent = String(pendingOrders.filter(function(o){ return o.status === 'wait'; }).length);
   }
@@ -1401,6 +1488,7 @@ function openRejectModal(id) {
     if (order) {
       order.status = 'no';
       order.rejectReason = reason;
+      sbRejectOrder(id, reason); // Supabase 업데이트
       updateNotifBadge();
       renderApproveList();
       renderMyOrders();
@@ -1978,6 +2066,7 @@ document.addEventListener('DOMContentLoaded', function() {
   renderHistoryHeader(cat);
   applyFilter();
   updateNotifBadge();
+  sbLoadOrders(); // Supabase에서 발주 목록 불러오기
 });
 </script>
 </body>
