@@ -246,87 +246,9 @@ textarea.form-control { resize: vertical; min-height: 70px; }
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">거래업체 <span style="font-size:11px;color:#888;font-weight:400;">(업체명 직접 입력 또는 선택, 외주 업체의 경우 작성)</span></label>
-              <input type="text" class="form-control" id="ord_vendor" list="dl_vendor" placeholder="업체명 직접 입력 또는 선택">
-              <datalist id="dl_vendor"><option value="G마켓">
-<option value="NPC">
-<option value="가나산업사">
-<option value="가야정밀산업">
-<option value="골드라인">
-<option value="골드라인파렛텍">
-<option value="광성산업">
-<option value="네이버">
-<option value="다물산업">
-<option value="대명제관">
-<option value="대생산업">
-<option value="대세산업">
-<option value="대신상사">
-<option value="대신종합상사">
-<option value="대우휠타">
-<option value="대진트라텍">
-<option value="대한과학">
-<option value="덕고산업">
-<option value="덕진">
-<option value="덕진기업">
-<option value="동방특수인쇄">
-<option value="동성철망">
-<option value="동일안전상사">
-<option value="동진포장">
-<option value="동진포장->동해포장">
-<option value="동해포장">
-<option value="모리콘">
-<option value="모텍스">
-<option value="비디오젯코리아">
-<option value="삼성종합특수인쇄">
-<option value="삼양기업">
-<option value="삼양종합브러쉬">
-<option value="새남소재">
-<option value="세경폴리백">
-<option value="세광실업">
-<option value="수성산업계기">
-<option value="수성산업기계">
-<option value="신우정보">
-<option value="신화유통">
-<option value="아이앤디">
-<option value="아이엠아이">
-<option value="안산정공">
-<option value="에스엠투네트웍스">
-<option value="엔피씨">
-<option value="엔피씨코어">
-<option value="엠케이씨">
-<option value="우주필터">
-<option value="우진산업">
-<option value="이니시스">
-<option value="이엠피테크">
-<option value="인화세이프티">
-<option value="재영전산">
-<option value="재은프라텍">
-<option value="제론텍">
-<option value="주연팩">
-<option value="진성">
-<option value="진성산업">
-<option value="진케미칼">
-<option value="청류에프앤에스">
-<option value="청호보루">
-<option value="청화인쇄">
-<option value="충남제재소">
-<option value="충신화학">
-<option value="코라">
-<option value="코라(KOLA)">
-<option value="쿠팡">
-<option value="태일인더스트리">
-<option value="태현로지스">
-<option value="태현파렛트">
-<option value="트렌디코리아">
-<option value="파란필터산업">
-<option value="플러스테크">
-<option value="필탑비즈컴">
-<option value="한국PMA">
-<option value="한국PMS">
-<option value="한국종합상사">
-<option value="한남케미칼">
-<option value="현대">
-<option value="현대마이크로"></datalist>
+              <label class="form-label">외주업체 <span style="font-size:11px;color:#888;font-weight:400;">(업체명 직접 입력)</span></label>
+              <input type="text" class="form-control" id="ord_vendor" placeholder="업체명 직접 입력">
+              
             </div>
             <div class="form-group">
               <label class="form-label">품목<span class="req">*</span></label>
@@ -1032,12 +954,17 @@ textarea.form-control { resize: vertical; min-height: 70px; }
       <div class="card">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
           <span class="card-title">발주 현황</span>
-          <button class="btn btn-secondary btn-sm" onclick="loadMyStatusFromDB()">새로고침</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-secondary btn-sm" id="statusAddRowBtn" style="display:none;" onclick="addStatusRow()">+ 행 추가</button>
+            <button class="btn btn-danger btn-sm" id="statusDelSelBtn" style="display:none;" onclick="deleteSelectedStatusRows()">선택 삭제</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadMyStatusFromDB()">새로고침</button>
+          </div>
         </div>
         <div class="card-body" style="padding:0;overflow-x:auto;">
           <table class="tbl" style="width:100%">
             <thead>
               <tr>
+                <th class="status-del-col-header" style="display:none;width:32px;text-align:center;"><input type="checkbox" id="statusCheckAll" onchange="toggleStatusCheckAll(this)"></th>
                 <th>신청일시</th>
                 <th>신청자</th>
                 <th>품목</th>
@@ -1045,13 +972,14 @@ textarea.form-control { resize: vertical; min-height: 70px; }
                 <th>수량</th>
                 <th>단위</th>
                 <th>사용부서</th>
-                <th>거래업체</th>
+                <th>외주업체</th>
                 <th>비고</th>
                 <th class="status-col-header">상태</th>
+                <th class="status-del-col-header" style="display:none;"></th>
               </tr>
             </thead>
             <tbody id="myStatusTbody">
-              <tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">신청된 발주가 없습니다</td></tr>
+              <tr><td colspan="12" style="text-align:center;padding:20px;color:#999;">신청된 발주가 없습니다</td></tr>
             </tbody>
           </table>
         </div>
@@ -1060,9 +988,6 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 
     <div id="tab-approve" class="tab-pane">
       <div class="notice-bar">⚠️ 승인 시 신청자 알림 발송은 전산 계열사 협의 후 배포 시 활성화됩니다.</div>
-      <div id="approveRoleNotice" style="display:none;background:#fff8dc;border:1px solid #e6c800;border-radius:6px;padding:10px 16px;margin-bottom:10px;font-size:13px;color:#7a5c00;">
-        현재 역할에서는 승인/반려 처리가 불가합니다. 담당자 또는 관리자로 전환 후 이용하세요.
-      </div>
       <div id="approveList">
         <div style="text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px;border:1px solid #e0e0e8;">
           대기 중인 발주 신청이 없습니다
@@ -1402,32 +1327,76 @@ function renderApproveList() {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px;border:1px solid #e0e0e8;">대기 중인 발주 신청이 없습니다</div>';
     return;
   }
-  var canApprove = (currentRole === 'approver' || currentRole === 'admin');
   var html = '';
   waitList.forEach(function(o) {
-    var idStr = String(o.id);
-    var actionHtml = canApprove
-      ? '<div class="approve-card-actions">'        + '<button class="btn btn-success btn-sm" onclick="approveOrder(\'' + idStr + '\')">승인</button>'        + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(\'' + idStr + '\')">반려</button>'        + '</div>'
-      : '<div style="padding:6px 0;font-size:12px;color:#888;">승인 권한이 없습니다</div>';
-    html += '<div class="approve-card">'          + '<div class="approve-card-header">'          + '<div><div class="approve-card-title">' + esc(o.item) + (o.spec ? ' (' + esc(o.spec) + ')' : '') + '</div>'          + '<div class="approve-card-meta">신청: ' + esc(o.name) + ' | ' + esc(o.dept) + ' | ' + o.datetime + '</div></div>'          + '<span class="badge badge-wait">승인대기</span>'          + '</div>'          + '<div class="approve-card-detail">'          + '<div><div class="lbl">수량</div><div class="val">' + esc(o.qty) + ' ' + esc(o.unit) + '</div></div>'          + '<div><div class="lbl">거래업체</div><div class="val">' + (o.vendor || '-') + '</div></div>'          + '<div><div class="lbl">비고</div><div class="val">' + (o.note || '-') + '</div></div>'          + '<div></div>'          + '</div>'          + actionHtml          + '</div>';
+    html += '<div class="approve-card">'
+          + '<div class="approve-card-header">'
+          + '<div><div class="approve-card-title">' + esc(o.item) + (o.spec ? ' (' + esc(o.spec) + ')' : '') + '</div>'
+          + '<div class="approve-card-meta">신청: ' + esc(o.name) + ' | ' + esc(o.dept) + ' | ' + o.datetime + '</div></div>'
+          + '<span class="badge badge-wait">승인대기</span>'
+          + '</div>'
+          + '<div class="approve-card-detail">'
+          + '<div><div class="lbl">수량</div><div class="val">' + esc(o.qty) + ' ' + esc(o.unit) + '</div></div>'
+          + '<div><div class="lbl">거래업체</div><div class="val">' + (o.vendor || '-') + '</div></div>'
+          + '<div><div class="lbl">비고</div><div class="val">' + (o.note || '-') + '</div></div>'
+          + '<div></div>'
+          + '</div>'
+          + '<div class="approve-card-actions">'
+          + '<button class="btn btn-success btn-sm" onclick="approveOrder(' + o.id + ')">승인</button>'
+          + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(' + o.id + ')">반려</button>'
+          + '</div></div>';
   });
   container.innerHTML = html;
 }
 
-
 function approveOrder(id) {
-  // 로컬 처리 (id가 문자열로 전달될 수 있으므로 타입 변환하여 비교)
+  // 로컬 처리
   var order = pendingOrders.find(function(o){ return String(o.id) === String(id); });
   if (order) {
     order.status = 'ok';
+
+    // ── 구매 이력 자동 추가 ──────────────────────────────
+    var rawDate = (order.datetime || order.request_date || '');
+    // "2026. 7. 30. 오후 3:45:00" 같은 한국 형식도 앞 10자 추출
+    var dateStr = rawDate.length >= 10 ? rawDate.substring(0, 10).replace(/\.\s*/g, '-').replace(/-$/, '') : rawDate;
+    var newRecord = [
+      order.name   || '',          // [0] 의뢰자
+      order.dept   || '',          // [1] 사용부서
+      dateStr,                     // [2] 발주일
+      '',                          // [3] 입고일
+      '',                          // [4] 입고
+      order.item   || '',          // [5] 품목
+      order.spec   || '',          // [6] 규격
+      String(order.qty || order.quantity || ''), // [7] 수량
+      order.unit   || '',          // [8] 단위
+      '',                          // [9] 단가
+      '',                          // [10] 금액
+      order.vendor || '',          // [11] 거래처(외주업체)
+      '소모품비',                   // [12] 예산계정
+      '',                          // [13] 보조코드
+      '',                          // [14] 전표
+      order.note   || ''           // [15] 비고
+    ];
+    allRecords.unshift(newRecord);
+    // 현재 필터된 목록에도 반영
+    var curCat = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '';
+    if (!curCat || curCat === '소모품비') {
+      filteredRecords.unshift(newRecord);
+      var countEl = document.getElementById('filterCount');
+      if (countEl) countEl.textContent = filteredRecords.length + '건';
+      renderHistoryPage(curCat);
+      renderHistoryPagination();
+    }
+    // ────────────────────────────────────────────────────
+
     updateNotifBadge();
     renderApproveList();
     renderStatusTab();
-    showToast('승인 처리되었습니다.');
+    showToast('승인 처리되었습니다. 구매 이력에 추가되었습니다.');
     var kpi4 = document.getElementById('kpi4');
     if (kpi4) kpi4.textContent = String(pendingOrders.filter(function(o){ return o.status === 'wait'; }).length);
   }
-  // Supabase 업데이트 (UUID 또는 문자열 id인 경우)
+  // Supabase 업데이트 (UUID인 경우)
   if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
     window.supabaseClient.from('pending_orders')
       .update({ status: '승인' })
@@ -1442,8 +1411,7 @@ function openRejectModal(id) {
   document.getElementById('modal-input').value = '';
   modalCallback = function() {
     var reason = document.getElementById('modal-input').value.trim();
-    // id가 문자열로 전달될 수 있으므로 타입 변환하여 비교
-    var order = pendingOrders.find(function(o){ return String(o.id) === String(id); });
+    var order = pendingOrders.find(function(o){ return o.id === id; });
     if (order) {
       order.status = 'no';
       order.rejectReason = reason;
@@ -1928,11 +1896,8 @@ function changeRole(role) {
   var navApprove = document.getElementById('navApprove');
   if (navApprove) navApprove.style.display = (role === 'user') ? 'none' : '';
 
-  // 발주 현황 상태 컬럼: 모든 역할에서 표시 (신청자도 상태 확인 가능)
-  var statusHeaders = document.querySelectorAll('.status-col-header');
-  var statusCells = document.querySelectorAll('.status-col-cell');
-  statusHeaders.forEach(function(el){ el.style.display = ''; });
-  statusCells.forEach(function(el){ el.style.display = ''; });
+  // 발주 현황 상태 컬럼 & 담당자 버튼: 역할에 따라 제어 후 재렌더링
+  renderStatusTab();
 
   // 담당자일 때 구매이력 기본값: 2026년 + 소모품비
   if (role === 'approver') {
@@ -1948,17 +1913,9 @@ function changeRole(role) {
   }
   applyFilter();
 
-  // 행 추가 버튼 표시/숨김
+  // 구매 이력 행 추가 버튼 표시/숨김
   var addBtn = document.getElementById('histAddRowBtn');
   if (addBtn) addBtn.style.display = (role === 'approver' || role === 'admin') ? '' : 'none';
-
-  // 승인 대기함 역할 안내 표시
-  var approveRoleNotice = document.getElementById('approveRoleNotice');
-  if (approveRoleNotice) {
-    approveRoleNotice.style.display = (role === 'user') ? '' : 'none';
-  }
-  // 승인 대기함 목록 다시 렌더 (버튼 표시 여부 업데이트)
-  renderApproveList();
 
   showToast(role === 'admin' ? '관리자 모드' : role === 'approver' ? '담당자 모드' : '신청자 모드');
 }
@@ -2035,14 +1992,15 @@ function addHistoryRow() {
   var cat = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '소모품비';
   var newRow = new Array(16).fill('');
   newRow[12] = cat;
-  allRecords.push(newRow);
-  filteredRecords.push(newRow);
-  histPage = Math.floor((filteredRecords.length - 1) / PAGE_SIZE);
+  // 위에서부터 추가 (unshift) → 첫 페이지로 이동
+  allRecords.unshift(newRow);
+  filteredRecords.unshift(newRow);
+  histPage = 0;
   renderHistoryPage(cat);
   renderHistoryPagination();
   var countEl = document.getElementById('filterCount');
   if (countEl) countEl.textContent = filteredRecords.length + '건';
-  showToast('새 행이 추가되었습니다.');
+  showToast('새 행이 맨 위에 추가되었습니다.');
 }
 
 // ── 초기화 ──────────────────────────────────────────────
@@ -2051,8 +2009,6 @@ document.addEventListener('DOMContentLoaded', function() {
   renderHistoryHeader(cat);
   applyFilter();
   updateNotifBadge();
-  // 초기 역할(신청자)에 맞게 UI 초기화
-  changeRole('user');
 });
 
 // =============================================
@@ -2070,7 +2026,7 @@ var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
     setInterval(function() {
       loadMyStatusFromDB();
       loadApproveListFromDB();
-    }, 3000);
+    }, 5000);
   } else {
     setTimeout(initSupabase, 500);
   }
@@ -2081,32 +2037,143 @@ function renderStatusTab() {
   var tbody = document.getElementById('myStatusTbody');
   if (!tbody) return;
   var list = myOrders;
+  var canEdit = (currentRole === 'approver' || currentRole === 'admin');
+  var hideStatus = (currentRole === 'user');
+
+  // 삭제 관련 컬럼 헤더 표시/숨김
+  document.querySelectorAll('.status-del-col-header').forEach(function(el){
+    el.style.display = canEdit ? '' : 'none';
+  });
+  // 행추가/선택삭제 버튼 표시/숨김
+  var sab = document.getElementById('statusAddRowBtn');
+  if (sab) sab.style.display = canEdit ? '' : 'none';
+  var sdb = document.getElementById('statusDelSelBtn');
+  if (sdb) sdb.style.display = canEdit ? '' : 'none';
+
+  var colTotal = canEdit ? 12 : 10;
   if (!list || list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">신청된 발주가 없습니다</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + colTotal + '" style="text-align:center;padding:20px;color:#999;">신청된 발주가 없습니다</td></tr>';
     return;
   }
   var html = '';
-  list.forEach(function(o) {
-    var badge = o.status === 'wait' ? '<span class="badge badge-wait">승인대기</span>'
-              : o.status === 'ok'   ? '<span class="badge badge-ok">승인완료</span>'
-              : o.status === '대기'  ? '<span class="badge badge-wait">승인대기</span>'
-              : o.status === '승인'  ? '<span class="badge badge-ok">승인완료</span>'
-              : o.status === '반려'  ? '<span class="badge badge-no">반려</span>'
+  list.forEach(function(o, idx) {
+    var badge = (o.status === 'wait' || o.status === '대기')
+              ? '<span class="badge badge-wait">승인대기</span>'
+              : (o.status === 'ok' || o.status === '승인')
+              ? '<span class="badge badge-ok">승인완료</span>'
               : '<span class="badge badge-no">반려</span>';
-    html += '<tr>'
-      + '<td>' + esc(o.datetime || o.request_date || '') + '</td>'
-      + '<td>' + esc(o.name || o.applicant || '') + '</td>'
-      + '<td>' + esc(o.item || '') + '</td>'
-      + '<td>' + esc(o.spec || '') + '</td>'
-      + '<td>' + esc(String(o.qty || o.quantity || '')) + '</td>'
-      + '<td>' + esc(o.unit || '') + '</td>'
-      + '<td>' + esc(o.dept || o.department || '') + '</td>'
-      + '<td>' + esc(o.vendor || '') + '</td>'
-      + '<td>' + esc(o.note || '') + '</td>'
-      + '<td class="status-col-cell">' + badge + '</td>'
-      + '</tr>';
+    var idStr = String(o.id || '').replace(/"/g, '&quot;');
+    if (canEdit) {
+      html += '<tr>'
+        + '<td style="text-align:center;"><input type="checkbox" class="status-row-chk" data-idx="' + idx + '"></td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','datetime')">' + esc(o.datetime || o.request_date || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','name')">' + esc(o.name || o.applicant || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','item')">' + esc(o.item || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','spec')">' + esc(o.spec || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','qty')">' + esc(String(o.qty || o.quantity || '')) + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','unit')">' + esc(o.unit || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','dept')">' + esc(o.dept || o.department || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','vendor')">' + esc(o.vendor || '') + '</td>'
+        + '<td contenteditable="true" onblur="saveStatusCell(this,' + idx + ','note')">' + esc(o.note || '') + '</td>'
+        + '<td class="status-col-cell">' + badge + '</td>'
+        + '<td><button class="btn-del-row" onclick="deleteStatusRow('' + idStr + '')">✕</button></td>'
+        + '</tr>';
+    } else {
+      html += '<tr>'
+        + '<td>' + esc(o.datetime || o.request_date || '') + '</td>'
+        + '<td>' + esc(o.name || o.applicant || '') + '</td>'
+        + '<td>' + esc(o.item || '') + '</td>'
+        + '<td>' + esc(o.spec || '') + '</td>'
+        + '<td>' + esc(String(o.qty || o.quantity || '')) + '</td>'
+        + '<td>' + esc(o.unit || '') + '</td>'
+        + '<td>' + esc(o.dept || o.department || '') + '</td>'
+        + '<td>' + esc(o.vendor || '') + '</td>'
+        + '<td>' + esc(o.note || '') + '</td>'
+        + '<td class="status-col-cell" style="' + (hideStatus ? 'display:none;' : '') + '">' + badge + '</td>'
+        + '</tr>';
+    }
   });
   tbody.innerHTML = html;
+}
+
+// 발주 현황 셀 인라인 저장
+function saveStatusCell(cell, idx, field) {
+  if (!myOrders[idx]) return;
+  myOrders[idx][field] = cell.textContent.trim();
+  // pendingOrders 동기화
+  var pid = myOrders[idx].id;
+  var po = pendingOrders.find(function(o){ return String(o.id) === String(pid); });
+  if (po) po[field] = cell.textContent.trim();
+}
+
+// 발주 현황 행 삭제
+function deleteStatusRow(id) {
+  var idx = myOrders.findIndex(function(o){ return String(o.id) === String(id); });
+  if (idx >= 0) myOrders.splice(idx, 1);
+  var pidx = pendingOrders.findIndex(function(o){ return String(o.id) === String(id); });
+  if (pidx >= 0) pendingOrders.splice(pidx, 1);
+  updateNotifBadge();
+  renderStatusTab();
+  renderApproveList();
+  showToast('발주 건이 삭제되었습니다.');
+  if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
+    window.supabaseClient.from('pending_orders').delete().eq('id', id).then(function(res){
+      if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(); }
+    });
+  }
+}
+
+// 발주 현황 선택 삭제
+function deleteSelectedStatusRows() {
+  var chks = document.querySelectorAll('.status-row-chk:checked');
+  if (chks.length === 0) { showToast('삭제할 항목을 선택하세요.'); return; }
+  var idxList = [];
+  chks.forEach(function(c){ idxList.push(parseInt(c.getAttribute('data-idx'))); });
+  // 내림차순 정렬 후 삭제 (index 밀림 방지)
+  idxList.sort(function(a,b){ return b - a; });
+  idxList.forEach(function(idx) {
+    if (!myOrders[idx]) return;
+    var id = myOrders[idx].id;
+    myOrders.splice(idx, 1);
+    var pidx = pendingOrders.findIndex(function(o){ return String(o.id) === String(id); });
+    if (pidx >= 0) pendingOrders.splice(pidx, 1);
+    if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
+      window.supabaseClient.from('pending_orders').delete().eq('id', id).then(function(){});
+    }
+  });
+  updateNotifBadge();
+  renderStatusTab();
+  renderApproveList();
+  showToast(idxList.length + '건 삭제되었습니다.');
+}
+
+// 발주 현황 전체 체크
+function toggleStatusCheckAll(cb) {
+  document.querySelectorAll('.status-row-chk').forEach(function(c){ c.checked = cb.checked; });
+}
+
+// 발주 현황 행 추가
+function addStatusRow() {
+  var now = new Date().toLocaleString('ko-KR');
+  var newOrder = {
+    id: Date.now(),
+    datetime: now,
+    name: '',
+    dept: '',
+    vendor: '',
+    item: '',
+    spec: '',
+    qty: '',
+    unit: '',
+    note: '',
+    status: 'wait'
+  };
+  myOrders.unshift(newOrder);
+  pendingOrders.unshift(newOrder);
+  updateNotifBadge();
+  renderStatusTab();
+  renderApproveList();
+  showToast('새 행이 추가되었습니다. 내용을 직접 입력하세요.');
 }
 
 // Supabase에서 발주 현황 로드
