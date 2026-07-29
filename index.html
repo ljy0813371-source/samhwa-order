@@ -1060,6 +1060,9 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 
     <div id="tab-approve" class="tab-pane">
       <div class="notice-bar">⚠️ 승인 시 신청자 알림 발송은 전산 계열사 협의 후 배포 시 활성화됩니다.</div>
+      <div id="approveRoleNotice" style="display:none;background:#fff8dc;border:1px solid #e6c800;border-radius:6px;padding:10px 16px;margin-bottom:10px;font-size:13px;color:#7a5c00;">
+        현재 역할에서는 승인/반려 처리가 불가합니다. 담당자 또는 관리자로 전환 후 이용하세요.
+      </div>
       <div id="approveList">
         <div style="text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px;border:1px solid #e0e0e8;">
           대기 중인 발주 신청이 없습니다
@@ -1399,31 +1402,22 @@ function renderApproveList() {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px;border:1px solid #e0e0e8;">대기 중인 발주 신청이 없습니다</div>';
     return;
   }
+  var canApprove = (currentRole === 'approver' || currentRole === 'admin');
   var html = '';
   waitList.forEach(function(o) {
-    html += '<div class="approve-card">'
-          + '<div class="approve-card-header">'
-          + '<div><div class="approve-card-title">' + esc(o.item) + (o.spec ? ' (' + esc(o.spec) + ')' : '') + '</div>'
-          + '<div class="approve-card-meta">신청: ' + esc(o.name) + ' | ' + esc(o.dept) + ' | ' + o.datetime + '</div></div>'
-          + '<span class="badge badge-wait">승인대기</span>'
-          + '</div>'
-          + '<div class="approve-card-detail">'
-          + '<div><div class="lbl">수량</div><div class="val">' + esc(o.qty) + ' ' + esc(o.unit) + '</div></div>'
-          + '<div><div class="lbl">거래업체</div><div class="val">' + (o.vendor || '-') + '</div></div>'
-          + '<div><div class="lbl">비고</div><div class="val">' + (o.note || '-') + '</div></div>'
-          + '<div></div>'
-          + '</div>'
-          + '<div class="approve-card-actions">'
-          + '<button class="btn btn-success btn-sm" onclick="approveOrder(' + o.id + ')">승인</button>'
-          + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(' + o.id + ')">반려</button>'
-          + '</div></div>';
+    var idStr = String(o.id);
+    var actionHtml = canApprove
+      ? '<div class="approve-card-actions">'        + '<button class="btn btn-success btn-sm" onclick="approveOrder(\'' + idStr + '\')">승인</button>'        + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(\'' + idStr + '\')">반려</button>'        + '</div>'
+      : '<div style="padding:6px 0;font-size:12px;color:#888;">승인 권한이 없습니다</div>';
+    html += '<div class="approve-card">'          + '<div class="approve-card-header">'          + '<div><div class="approve-card-title">' + esc(o.item) + (o.spec ? ' (' + esc(o.spec) + ')' : '') + '</div>'          + '<div class="approve-card-meta">신청: ' + esc(o.name) + ' | ' + esc(o.dept) + ' | ' + o.datetime + '</div></div>'          + '<span class="badge badge-wait">승인대기</span>'          + '</div>'          + '<div class="approve-card-detail">'          + '<div><div class="lbl">수량</div><div class="val">' + esc(o.qty) + ' ' + esc(o.unit) + '</div></div>'          + '<div><div class="lbl">거래업체</div><div class="val">' + (o.vendor || '-') + '</div></div>'          + '<div><div class="lbl">비고</div><div class="val">' + (o.note || '-') + '</div></div>'          + '<div></div>'          + '</div>'          + actionHtml          + '</div>';
   });
   container.innerHTML = html;
 }
 
+
 function approveOrder(id) {
-  // 로컬 처리
-  var order = pendingOrders.find(function(o){ return o.id === id; });
+  // 로컬 처리 (id가 문자열로 전달될 수 있으므로 타입 변환하여 비교)
+  var order = pendingOrders.find(function(o){ return String(o.id) === String(id); });
   if (order) {
     order.status = 'ok';
     updateNotifBadge();
@@ -1433,7 +1427,7 @@ function approveOrder(id) {
     var kpi4 = document.getElementById('kpi4');
     if (kpi4) kpi4.textContent = String(pendingOrders.filter(function(o){ return o.status === 'wait'; }).length);
   }
-  // Supabase 업데이트 (UUID인 경우)
+  // Supabase 업데이트 (UUID 또는 문자열 id인 경우)
   if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
     window.supabaseClient.from('pending_orders')
       .update({ status: '승인' })
@@ -1448,7 +1442,8 @@ function openRejectModal(id) {
   document.getElementById('modal-input').value = '';
   modalCallback = function() {
     var reason = document.getElementById('modal-input').value.trim();
-    var order = pendingOrders.find(function(o){ return o.id === id; });
+    // id가 문자열로 전달될 수 있으므로 타입 변환하여 비교
+    var order = pendingOrders.find(function(o){ return String(o.id) === String(id); });
     if (order) {
       order.status = 'no';
       order.rejectReason = reason;
@@ -1933,12 +1928,11 @@ function changeRole(role) {
   var navApprove = document.getElementById('navApprove');
   if (navApprove) navApprove.style.display = (role === 'user') ? 'none' : '';
 
-  // 발주 현황 상태 컬럼: 신청자일 때 숨김
-  var hideStatus = (role === 'user');
+  // 발주 현황 상태 컬럼: 모든 역할에서 표시 (신청자도 상태 확인 가능)
   var statusHeaders = document.querySelectorAll('.status-col-header');
   var statusCells = document.querySelectorAll('.status-col-cell');
-  statusHeaders.forEach(function(el){ el.style.display = hideStatus ? 'none' : ''; });
-  statusCells.forEach(function(el){ el.style.display = hideStatus ? 'none' : ''; });
+  statusHeaders.forEach(function(el){ el.style.display = ''; });
+  statusCells.forEach(function(el){ el.style.display = ''; });
 
   // 담당자일 때 구매이력 기본값: 2026년 + 소모품비
   if (role === 'approver') {
@@ -1957,6 +1951,14 @@ function changeRole(role) {
   // 행 추가 버튼 표시/숨김
   var addBtn = document.getElementById('histAddRowBtn');
   if (addBtn) addBtn.style.display = (role === 'approver' || role === 'admin') ? '' : 'none';
+
+  // 승인 대기함 역할 안내 표시
+  var approveRoleNotice = document.getElementById('approveRoleNotice');
+  if (approveRoleNotice) {
+    approveRoleNotice.style.display = (role === 'user') ? '' : 'none';
+  }
+  // 승인 대기함 목록 다시 렌더 (버튼 표시 여부 업데이트)
+  renderApproveList();
 
   showToast(role === 'admin' ? '관리자 모드' : role === 'approver' ? '담당자 모드' : '신청자 모드');
 }
@@ -2049,6 +2051,8 @@ document.addEventListener('DOMContentLoaded', function() {
   renderHistoryHeader(cat);
   applyFilter();
   updateNotifBadge();
+  // 초기 역할(신청자)에 맞게 UI 초기화
+  changeRole('user');
 });
 
 // =============================================
@@ -2066,7 +2070,7 @@ var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
     setInterval(function() {
       loadMyStatusFromDB();
       loadApproveListFromDB();
-    }, 5000);
+    }, 3000);
   } else {
     setTimeout(initSupabase, 500);
   }
@@ -2081,7 +2085,6 @@ function renderStatusTab() {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:#999;">신청된 발주가 없습니다</td></tr>';
     return;
   }
-  var hideStatus = (currentRole === 'user');
   var html = '';
   list.forEach(function(o) {
     var badge = o.status === 'wait' ? '<span class="badge badge-wait">승인대기</span>'
@@ -2100,7 +2103,7 @@ function renderStatusTab() {
       + '<td>' + esc(o.dept || o.department || '') + '</td>'
       + '<td>' + esc(o.vendor || '') + '</td>'
       + '<td>' + esc(o.note || '') + '</td>'
-      + '<td class="status-col-cell" style="' + (hideStatus ? 'display:none;' : '') + '">' + badge + '</td>'
+      + '<td class="status-col-cell">' + badge + '</td>'
       + '</tr>';
   });
   tbody.innerHTML = html;
