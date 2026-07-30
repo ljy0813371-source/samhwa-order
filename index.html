@@ -1299,12 +1299,15 @@ function submitOrder() {
       spec: order.spec,
       quantity: parseInt(order.qty) || 0,
       unit: order.unit,
-      order_date: order.orderDate,
-      delivery_date: order.deliveryDate,
       note: order.note,
       status: '대기'
     }).then(function(res) {
-      if (!res.error) { loadMyStatusFromDB(); loadApproveListFromDB(); }
+      if (!res.error) {
+        loadMyStatusFromDB();
+        loadApproveListFromDB();
+      } else {
+        showToast('서버 저장에 실패했습니다. 네트워크 상태를 확인해주세요.');
+      }
     });
   }
 }
@@ -1369,46 +1372,10 @@ function approveOrder(id) {
   if (order) {
     order.status = 'ok';
 
-    // ── 구매 이력 자동 추가 ──────────────────────────────
-    // 승인 시 아래 8개 항목만 구매 이력으로 넘기고 나머지 컬럼은 공란으로 둔다.
-    // 발주일: 발주 신청서에서 입력한 발주일(order.orderDate)을 우선 사용, 없으면 신청 일시에서 날짜만 추출
-    var rawDate = (order.datetime || order.request_date || '');
-    var fallbackDate = rawDate.length >= 10 ? rawDate.substring(0, 10).replace(/\.\s*/g, '-').replace(/-$/, '') : rawDate;
-    var dateStr = order.orderDate || fallbackDate;
-    var newRecord = [
-      order.name   || '',          // [0] 의뢰자 (신청자)
-      order.dept   || '',          // [1] 사용부서
-      dateStr,                     // [2] 발주일
-      '',                          // [3] 입고일
-      '',                          // [4] 입고
-      order.item   || '',          // [5] 품목
-      order.spec   || '',          // [6] 규격
-      String(order.qty || order.quantity || ''), // [7] 수량
-      order.unit   || '',          // [8] 단위
-      '',                          // [9] 단가
-      '',                          // [10] 금액
-      '',                          // [11] 거래처 (공란)
-      '',                          // [12] 예산계정 (공란)
-      '',                          // [13] 보조코드
-      '',                          // [14] 전표
-      order.note   || ''           // [15] 비고/요청사항
-    ];
-    allRecords.unshift(newRecord);
-    // 현재 필터된 목록에도 반영 (예산계정이 공란이므로 '전체 항목' 보기일 때만 즉시 표시)
-    var curCat = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '';
-    if (!curCat) {
-      filteredRecords.unshift(newRecord);
-      var countEl = document.getElementById('filterCount');
-      if (countEl) countEl.textContent = filteredRecords.length + '건';
-      renderHistoryPage(curCat);
-      renderHistoryPagination();
-    }
-    // ────────────────────────────────────────────────────
-
     updateNotifBadge();
     renderApproveList();
     renderStatusTab();
-    showToast('승인 처리되었습니다. 구매 이력에 추가되었습니다.');
+    showToast('승인 처리되었습니다.');
     var kpi4 = document.getElementById('kpi4');
     if (kpi4) kpi4.textContent = String(pendingOrders.filter(function(o){ return o.status === 'wait'; }).length);
   }
