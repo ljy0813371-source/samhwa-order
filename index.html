@@ -936,6 +936,14 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 <option value="통">
 <option value="팩"></datalist>
             </div>
+            <div class="form-group">
+              <label class="form-label">발주일</label>
+              <input type="date" class="form-control" id="ord_order_date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">입고 요청일</label>
+              <input type="date" class="form-control" id="ord_delivery_date">
+            </div>
             <div class="form-group full">
               <label class="form-label">비고 / 요청사항</label>
               <textarea class="form-control" id="ord_note" placeholder="요청사항을 입력하세요"></textarea>
@@ -1241,7 +1249,7 @@ function showTab(name, el) {
 
 // ── 발주 신청 ───────────────────────────────────────────
 function resetOrderForm() {
-  ['ord_name','ord_dept','ord_vendor','ord_item','ord_spec','ord_qty','ord_unit','ord_note'].forEach(function(id) {
+  ['ord_name','ord_dept','ord_vendor','ord_item','ord_spec','ord_qty','ord_unit','ord_order_date','ord_delivery_date','ord_note'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1256,6 +1264,8 @@ function submitOrder() {
     showToast('신청자, 사용부서, 품목, 수량은 필수입니다.');
     return;
   }
+  var orderDateInput = document.getElementById('ord_order_date').value; // YYYY-MM-DD
+  var todayStr = new Date().toISOString().slice(0, 10);
   var order = {
     id: Date.now(),
     datetime: new Date().toLocaleString('ko-KR'),
@@ -1266,6 +1276,8 @@ function submitOrder() {
     spec: document.getElementById('ord_spec').value.trim(),
     qty: qty,
     unit: document.getElementById('ord_unit').value.trim(),
+    orderDate: orderDateInput || todayStr,
+    deliveryDate: document.getElementById('ord_delivery_date').value || '',
     note: document.getElementById('ord_note').value.trim(),
     status: 'wait'
   };
@@ -1287,6 +1299,8 @@ function submitOrder() {
       spec: order.spec,
       quantity: parseInt(order.qty) || 0,
       unit: order.unit,
+      order_date: order.orderDate,
+      delivery_date: order.deliveryDate,
       note: order.note,
       status: '대기'
     }).then(function(res) {
@@ -1339,11 +1353,11 @@ function renderApproveList() {
           + '<div><div class="lbl">수량</div><div class="val">' + esc(o.qty) + ' ' + esc(o.unit) + '</div></div>'
           + '<div><div class="lbl">거래업체</div><div class="val">' + (o.vendor || '-') + '</div></div>'
           + '<div><div class="lbl">비고</div><div class="val">' + (o.note || '-') + '</div></div>'
-          + '<div></div>'
+          + '<div><div class="lbl">발주일 / 입고요청일</div><div class="val">' + esc(o.orderDate || '-') + ' / ' + esc(o.deliveryDate || '-') + '</div></div>'
           + '</div>'
           + '<div class="approve-card-actions">'
-          + '<button class="btn btn-success btn-sm" onclick="approveOrder(' + o.id + ')">승인</button>'
-          + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(' + o.id + ')">반려</button>'
+          + '<button class="btn btn-success btn-sm" onclick="approveOrder(\'' + String(o.id).replace(/'/g, "\\'") + '\')">승인</button>'
+          + '<button class="btn btn-danger btn-sm" onclick="openRejectModal(\'' + String(o.id).replace(/'/g, "\\'") + '\')">반려</button>'
           + '</div></div>';
   });
   container.innerHTML = html;
@@ -1356,11 +1370,13 @@ function approveOrder(id) {
     order.status = 'ok';
 
     // ── 구매 이력 자동 추가 ──────────────────────────────
+    // 승인 시 아래 8개 항목만 구매 이력으로 넘기고 나머지 컬럼은 공란으로 둔다.
+    // 발주일: 발주 신청서에서 입력한 발주일(order.orderDate)을 우선 사용, 없으면 신청 일시에서 날짜만 추출
     var rawDate = (order.datetime || order.request_date || '');
-    // "2026. 7. 30. 오후 3:45:00" 같은 한국 형식도 앞 10자 추출
-    var dateStr = rawDate.length >= 10 ? rawDate.substring(0, 10).replace(/\.\s*/g, '-').replace(/-$/, '') : rawDate;
+    var fallbackDate = rawDate.length >= 10 ? rawDate.substring(0, 10).replace(/\.\s*/g, '-').replace(/-$/, '') : rawDate;
+    var dateStr = order.orderDate || fallbackDate;
     var newRecord = [
-      order.name   || '',          // [0] 의뢰자
+      order.name   || '',          // [0] 의뢰자 (신청자)
       order.dept   || '',          // [1] 사용부서
       dateStr,                     // [2] 발주일
       '',                          // [3] 입고일
@@ -1371,16 +1387,16 @@ function approveOrder(id) {
       order.unit   || '',          // [8] 단위
       '',                          // [9] 단가
       '',                          // [10] 금액
-      order.vendor || '',          // [11] 거래처(외주업체)
-      '소모품비',                   // [12] 예산계정
+      '',                          // [11] 거래처 (공란)
+      '',                          // [12] 예산계정 (공란)
       '',                          // [13] 보조코드
       '',                          // [14] 전표
-      order.note   || ''           // [15] 비고
+      order.note   || ''           // [15] 비고/요청사항
     ];
     allRecords.unshift(newRecord);
-    // 현재 필터된 목록에도 반영
+    // 현재 필터된 목록에도 반영 (예산계정이 공란이므로 '전체 항목' 보기일 때만 즉시 표시)
     var curCat = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '';
-    if (!curCat || curCat === '소모품비') {
+    if (!curCat) {
       filteredRecords.unshift(newRecord);
       var countEl = document.getElementById('filterCount');
       if (countEl) countEl.textContent = filteredRecords.length + '건';
@@ -1411,7 +1427,7 @@ function openRejectModal(id) {
   document.getElementById('modal-input').value = '';
   modalCallback = function() {
     var reason = document.getElementById('modal-input').value.trim();
-    var order = pendingOrders.find(function(o){ return o.id === id; });
+    var order = pendingOrders.find(function(o){ return String(o.id) === String(id); });
     if (order) {
       order.status = 'no';
       order.rejectReason = reason;
@@ -2197,6 +2213,8 @@ function loadMyStatusFromDB() {
           spec: r.spec || '',
           qty: String(r.quantity || ''),
           unit: r.unit || '',
+          orderDate: r.order_date || '',
+          deliveryDate: r.delivery_date || '',
           note: r.note || '',
           status: r.status === '승인' ? 'ok' : r.status === '반려' ? 'no' : 'wait'
         };
@@ -2233,6 +2251,8 @@ function loadApproveListFromDB() {
           spec: r.spec || '',
           qty: String(r.quantity || ''),
           unit: r.unit || '',
+          orderDate: r.order_date || '',
+          deliveryDate: r.delivery_date || '',
           note: r.note || '',
           status: 'wait'
         });
