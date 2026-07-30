@@ -2021,7 +2021,6 @@ function renderStatusTab() {
   if (!tbody) return;
   var list = myOrders;
   var canEdit = (currentRole === 'approver' || currentRole === 'admin');
-  var hideStatus = (currentRole === 'user');
 
   // 삭제 관련 컬럼 헤더 표시/숨김
   document.querySelectorAll('.status-del-col-header').forEach(function(el){
@@ -2072,7 +2071,7 @@ function renderStatusTab() {
         + '<td>' + esc(o.dept || o.department || '') + '</td>'
         + '<td>' + esc(o.vendor || '') + '</td>'
         + '<td>' + esc(o.note || '') + '</td>'
-        + '<td class="status-col-cell" style="' + (hideStatus ? 'display:none;' : '') + '">' + badge + '</td>'
+        + '<td class="status-col-cell">' + badge + '</td>'
         + '</tr>';
     }
   });
