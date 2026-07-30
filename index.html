@@ -1303,7 +1303,7 @@ function submitOrder() {
       status: '대기'
     }).then(function(res) {
       if (!res.error) {
-        loadMyStatusFromDB();
+        loadMyStatusFromDB(true);
         loadApproveListFromDB();
       } else {
         showToast('서버 저장에 실패했습니다. 네트워크 상태를 확인해주세요.');
@@ -1385,7 +1385,7 @@ function approveOrder(id) {
       .update({ status: '승인' })
       .eq('id', id)
       .then(function(res) {
-        if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(); }
+        if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
       });
   }
 }
@@ -1409,7 +1409,7 @@ function openRejectModal(id) {
         .update({ status: '반려', reject_reason: reason })
         .eq('id', id)
         .then(function(res) {
-          if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(); }
+          if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
         });
     }
     closeModal();
@@ -2003,11 +2003,11 @@ var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 (function initSupabase() {
   if (typeof supabase !== 'undefined' && supabase.createClient) {
     window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    loadMyStatusFromDB();
+    loadMyStatusFromDB(true);
     loadApproveListFromDB();
     // 5초마다 자동 갱신
     setInterval(function() {
-      loadMyStatusFromDB();
+      loadMyStatusFromDB(true);
       loadApproveListFromDB();
     }, 5000);
   } else {
@@ -2100,7 +2100,7 @@ function deleteStatusRow(id) {
   showToast('발주 건이 삭제되었습니다.');
   if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
     window.supabaseClient.from('pending_orders').delete().eq('id', id).then(function(res){
-      if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(); }
+      if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
     });
   }
 }
@@ -2159,13 +2159,19 @@ function addStatusRow() {
 }
 
 // Supabase에서 발주 현황 로드
-function loadMyStatusFromDB() {
-  if (!window.supabaseClient) return;
+function loadMyStatusFromDB(silent) {
+  if (!window.supabaseClient) {
+    if (!silent) showToast('서버에 연결되어 있지 않습니다.');
+    return;
+  }
   window.supabaseClient.from('pending_orders')
     .select('*')
     .order('created_at', { ascending: false })
     .then(function(res) {
-      if (res.error) return;
+      if (res.error) {
+        if (!silent) showToast('새로고침에 실패했습니다.');
+        return;
+      }
       var data = res.data || [];
       // Supabase 데이터를 myOrders 형식으로 변환
       myOrders = data.map(function(r) {
@@ -2186,6 +2192,7 @@ function loadMyStatusFromDB() {
         };
       });
       renderStatusTab();
+      if (!silent) showToast('발주 현황을 새로고침했습니다.');
     });
 }
 
