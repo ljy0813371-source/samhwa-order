@@ -173,7 +173,8 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   padding: 4px;
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -1301,9 +1302,9 @@ function submitOrder() {
   renderStatusTab();
   resetOrderForm();
   showToast('발주 신청이 완료되었습니다. 담당자 승인 대기 중입니다.');
-  // Supabase 저장
-  if (window.supabaseClient) {
-    window.supabaseClient.from('pending_orders').insert({
+  // Firebase(Firestore) 저장
+  if (window.dbClient) {
+    window.dbClient.collection('pending_orders').add({
       applicant: order.name,
       department: order.dept,
       request_date: order.datetime,
@@ -1315,15 +1316,14 @@ function submitOrder() {
       order_date: order.orderDate,
       delivery_date: order.deliveryDate,
       note: order.note,
-      status: '대기'
-    }).then(function(res) {
-      if (!res.error) {
-        loadMyStatusFromDB(true);
-        loadApproveListFromDB();
-      } else {
-        console.error('발주 신청 서버 저장 실패:', res.error);
-        showToast('서버 저장에 실패했습니다. 네트워크 상태를 확인해주세요.');
-      }
+      status: '대기',
+      created_at: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(function() {
+      loadMyStatusFromDB(true);
+      loadApproveListFromDB();
+    }).catch(function(err) {
+      console.error('발주 신청 서버 저장 실패:', err);
+      showToast('서버 저장에 실패했습니다. 네트워크 상태를 확인해주세요.');
     });
   }
 }
@@ -1395,15 +1395,12 @@ function approveOrder(id) {
     var kpi4 = document.getElementById('kpi4');
     if (kpi4) kpi4.textContent = String(pendingOrders.filter(function(o){ return o.status === 'wait'; }).length);
   }
-  // Supabase 업데이트 (UUID인 경우)
-  if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
-    window.supabaseClient.from('pending_orders')
+  // Firebase(Firestore) 업데이트 (서버에 저장된 항목인 경우)
+  if (window.dbClient && typeof id === 'string') {
+    window.dbClient.collection('pending_orders').doc(id)
       .update({ status: '승인' })
-      .eq('id', id)
-      .then(function(res) {
-        if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
-        else { console.error('승인 처리 서버 저장 실패:', res.error); }
-      });
+      .then(function() { loadApproveListFromDB(); loadMyStatusFromDB(true); })
+      .catch(function(err) { console.error('승인 처리 서버 저장 실패:', err); });
   }
 }
 
@@ -1420,15 +1417,12 @@ function openRejectModal(id) {
       renderStatusTab();
       showToast('반려 처리되었습니다.');
     }
-    // Supabase 업데이트 (UUID인 경우)
-    if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
-      window.supabaseClient.from('pending_orders')
+    // Firebase(Firestore) 업데이트 (서버에 저장된 항목인 경우)
+    if (window.dbClient && typeof id === 'string') {
+      window.dbClient.collection('pending_orders').doc(id)
         .update({ status: '반려', reject_reason: reason })
-        .eq('id', id)
-        .then(function(res) {
-          if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
-          else { console.error('반려 처리 서버 저장 실패:', res.error); }
-        });
+        .then(function() { loadApproveListFromDB(); loadMyStatusFromDB(true); })
+        .catch(function(err) { console.error('반려 처리 서버 저장 실패:', err); });
     }
     closeModal();
   };
@@ -2026,14 +2020,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // =============================================
-// Supabase 초기화
+// Firebase 초기화
 // =============================================
-var SUPABASE_URL = 'https://twgiucbkczlkmwasxbfs.supabase.co';
-var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR3Z2l1Y2JrY3psa213YXN4YmZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyOTMyNzYsImV4cCI6MjEwMDg2OTI3Nn0.RgTXH6xKqWotDQU_5n4uayPojS9fo8yXJWmn_ehq948';
+var firebaseConfig = {
+  apiKey: "AIzaSyALk6VKsQh08Wm236bewKIKzXlawQhC1zM",
+  authDomain: "samhwa-order.firebaseapp.com",
+  projectId: "samhwa-order",
+  storageBucket: "samhwa-order.firebasestorage.app",
+  messagingSenderId: "613764557258",
+  appId: "1:613764557258:web:3cf01bc678eccbdda3c733",
+  measurementId: "G-92WLV20ZDQ"
+};
 
-(function initSupabase() {
-  if (typeof supabase !== 'undefined' && supabase.createClient) {
-    window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+(function initFirebase() {
+  if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+    firebase.initializeApp(firebaseConfig);
+    window.dbClient = firebase.firestore();
     loadMyStatusFromDB(true);
     loadApproveListFromDB();
     // 5초마다 자동 갱신
@@ -2042,7 +2044,7 @@ var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
       loadApproveListFromDB();
     }, 5000);
   } else {
-    setTimeout(initSupabase, 500);
+    setTimeout(initFirebase, 500);
   }
 })();
 
@@ -2129,9 +2131,9 @@ function deleteStatusRow(id) {
   renderStatusTab();
   renderApproveList();
   showToast('발주 건이 삭제되었습니다.');
-  if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
-    window.supabaseClient.from('pending_orders').delete().eq('id', id).then(function(res){
-      if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
+  if (window.dbClient && typeof id === 'string') {
+    window.dbClient.collection('pending_orders').doc(id).delete().then(function(){
+      loadApproveListFromDB(); loadMyStatusFromDB(true);
     });
   }
 }
@@ -2150,8 +2152,8 @@ function deleteSelectedStatusRows() {
     myOrders.splice(idx, 1);
     var pidx = pendingOrders.findIndex(function(o){ return String(o.id) === String(id); });
     if (pidx >= 0) pendingOrders.splice(pidx, 1);
-    if (window.supabaseClient && typeof id === 'string' && id.includes('-')) {
-      window.supabaseClient.from('pending_orders').delete().eq('id', id).then(function(){});
+    if (window.dbClient && typeof id === 'string') {
+      window.dbClient.collection('pending_orders').doc(id).delete().then(function(){});
     }
   });
   updateNotifBadge();
@@ -2189,25 +2191,21 @@ function addStatusRow() {
   showToast('새 행이 추가되었습니다. 내용을 직접 입력하세요.');
 }
 
-// Supabase에서 발주 현황 로드
+// Firebase(Firestore)에서 발주 현황 로드
 function loadMyStatusFromDB(silent) {
-  if (!window.supabaseClient) {
+  if (!window.dbClient) {
     if (!silent) showToast('서버에 연결되어 있지 않습니다.');
     return;
   }
-  window.supabaseClient.from('pending_orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .then(function(res) {
-      if (res.error) {
-        if (!silent) showToast('새로고침에 실패했습니다.');
-        return;
-      }
-      var data = res.data || [];
-      // Supabase 데이터를 myOrders 형식으로 변환
-      myOrders = data.map(function(r) {
+  window.dbClient.collection('pending_orders')
+    .orderBy('created_at', 'desc')
+    .get()
+    .then(function(snapshot) {
+      // Firestore 데이터를 myOrders 형식으로 변환
+      myOrders = snapshot.docs.map(function(doc) {
+        var r = doc.data();
         return {
-          id: r.id,
+          id: doc.id,
           datetime: r.request_date || '',
           name: r.applicant || '',
           dept: r.department || '',
@@ -2224,26 +2222,25 @@ function loadMyStatusFromDB(silent) {
       });
       renderStatusTab();
       if (!silent) showToast('발주 현황을 새로고침했습니다.');
+    })
+    .catch(function(err) {
+      console.error('발주 현황 로드 실패:', err);
+      if (!silent) showToast('새로고침에 실패했습니다.');
     });
 }
 
-// Supabase에서 승인 대기함 로드
+// Firebase(Firestore)에서 승인 대기함 로드
 function loadApproveListFromDB() {
-  if (!window.supabaseClient) return;
-  window.supabaseClient.from('pending_orders')
-    .select('*')
-    .eq('status', '대기')
-    .order('created_at', { ascending: false })
-    .then(function(res) {
-      if (res.error) return;
-      var data = res.data || [];
-      // 로컬 pendingOrders에 머지 (DB UUID 기반)
-      var dbIds = data.map(function(r){ return r.id; });
-      // 로컬에만 있는 항목 제거, DB 항목으로 대체
+  if (!window.dbClient) return;
+  window.dbClient.collection('pending_orders')
+    .orderBy('created_at', 'desc')
+    .get()
+    .then(function(snapshot) {
+      var data = snapshot.docs
+        .map(function(doc) { return Object.assign({ id: doc.id }, doc.data()); })
+        .filter(function(r) { return r.status === '대기'; });
       // DB를 단일 원본으로 사용 (로컬 낙관적 추가분 제거 → 중복 방지)
-      pendingOrders = pendingOrders.filter(function(o){
-        return false;
-      });
+      pendingOrders = [];
       data.forEach(function(r) {
         pendingOrders.unshift({
           id: r.id,
@@ -2263,6 +2260,9 @@ function loadApproveListFromDB() {
       });
       updateNotifBadge();
       renderApproveList();
+    })
+    .catch(function(err) {
+      console.error('승인 대기함 로드 실패:', err);
     });
 }
 
