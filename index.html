@@ -1312,6 +1312,8 @@ function submitOrder() {
       spec: order.spec,
       quantity: parseInt(order.qty) || 0,
       unit: order.unit,
+      order_date: order.orderDate,
+      delivery_date: order.deliveryDate,
       note: order.note,
       status: '대기'
     }).then(function(res) {
@@ -1319,6 +1321,7 @@ function submitOrder() {
         loadMyStatusFromDB(true);
         loadApproveListFromDB();
       } else {
+        console.error('발주 신청 서버 저장 실패:', res.error);
         showToast('서버 저장에 실패했습니다. 네트워크 상태를 확인해주세요.');
       }
     });
@@ -1399,6 +1402,7 @@ function approveOrder(id) {
       .eq('id', id)
       .then(function(res) {
         if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
+        else { console.error('승인 처리 서버 저장 실패:', res.error); }
       });
   }
 }
@@ -1423,6 +1427,7 @@ function openRejectModal(id) {
         .eq('id', id)
         .then(function(res) {
           if (!res.error) { loadApproveListFromDB(); loadMyStatusFromDB(true); }
+          else { console.error('반려 처리 서버 저장 실패:', res.error); }
         });
     }
     closeModal();
