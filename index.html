@@ -936,11 +936,11 @@ textarea.form-control { resize: vertical; min-height: 70px; }
 <option value="팩"></datalist>
             </div>
             <div class="form-group">
-              <label class="form-label">발주일</label>
+              <label class="form-label">발주일<span class="req">*</span></label>
               <input type="date" class="form-control" id="ord_order_date">
             </div>
             <div class="form-group">
-              <label class="form-label">입고 요청일</label>
+              <label class="form-label">입고 요청일<span class="req">*</span></label>
               <input type="date" class="form-control" id="ord_delivery_date">
             </div>
             <div class="form-group full">
@@ -1259,12 +1259,26 @@ function submitOrder() {
   var dept = document.getElementById('ord_dept').value;
   var item = document.getElementById('ord_item').value.trim();
   var qty  = document.getElementById('ord_qty').value.trim();
-  if (!name || !dept || !item || !qty) {
-    showToast('신청자, 사용부서, 품목, 수량은 필수입니다.');
-    return;
-  }
   var orderDateInput = document.getElementById('ord_order_date').value; // YYYY-MM-DD
-  var todayStr = new Date().toISOString().slice(0, 10);
+  var deliveryDateInput = document.getElementById('ord_delivery_date').value; // YYYY-MM-DD
+
+  // 필수 입력 항목 검증: 신청자, 사용부서, 품목, 수량, 발주일, 입고 요청일
+  var requiredFields = [
+    { id: 'ord_name', value: name },
+    { id: 'ord_dept', value: dept },
+    { id: 'ord_item', value: item },
+    { id: 'ord_qty', value: qty },
+    { id: 'ord_order_date', value: orderDateInput },
+    { id: 'ord_delivery_date', value: deliveryDateInput }
+  ];
+  for (var i = 0; i < requiredFields.length; i++) {
+    if (!requiredFields[i].value) {
+      alert('필수 입력 사항 작성 필요');
+      var elToFocus = document.getElementById(requiredFields[i].id);
+      if (elToFocus) elToFocus.focus();
+      return;
+    }
+  }
   var order = {
     id: Date.now(),
     datetime: new Date().toLocaleString('ko-KR'),
@@ -1275,8 +1289,8 @@ function submitOrder() {
     spec: document.getElementById('ord_spec').value.trim(),
     qty: qty,
     unit: document.getElementById('ord_unit').value.trim(),
-    orderDate: orderDateInput || todayStr,
-    deliveryDate: document.getElementById('ord_delivery_date').value || '',
+    orderDate: orderDateInput,
+    deliveryDate: deliveryDateInput,
     note: document.getElementById('ord_note').value.trim(),
     status: 'wait'
   };
@@ -1968,7 +1982,7 @@ function confirmImport() {
   };
   setVal('ord_name',   r[0]);   // 신청자
   setVal('ord_dept',   r[1]);   // 사용부서 (select는 value로 설정)
-  setVal('ord_vendor', r[11]);  // 거래처
+  // 거래처(구매이력)는 외주업체 필드로 자동 반영하지 않음
   setVal('ord_item',   r[5]);   // 품목
   setVal('ord_spec',   r[6]);   // 규격
   setVal('ord_qty',    r[7]);   // 수량
