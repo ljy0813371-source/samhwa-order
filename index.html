@@ -188,9 +188,9 @@ textarea.form-control { resize: vertical; min-height: 70px; }
   <div class="sidebar-section">메뉴</div>
   <div class="nav-item active" onclick="showTab('order',this)"><span class="nav-icon">📋</span><span>발주 신청</span></div>
   <div class="nav-item" onclick="showTab('mystatus',this)" id="navMystatus"><span class="nav-icon">📝</span><span>발주 현황</span></div>
-  <div class="nav-item" onclick="showTab('approve',this)" id="navApprove"><span class="nav-icon">✅</span><span>승인 대기함</span></div>
+  <div class="nav-item" onclick="showTab('approve',this)" id="navApprove" style="display:none;"><span class="nav-icon">✅</span><span>승인 대기함</span></div>
   <div class="nav-item" onclick="showTab('history',this)"><span class="nav-icon">📂</span><span>구매 이력</span></div>
-  <div class="nav-item" onclick="showTab('dashboard',this)"><span class="nav-icon">📊</span><span>대시보드</span></div>
+  <div class="nav-item" onclick="showTab('dashboard',this)" id="navDashboard" style="display:none;"><span class="nav-icon">📊</span><span>대시보드</span></div>
   <div class="sidebar-section admin-only-nav" style="display:none;">관리</div>
   <div class="nav-item admin-only-nav" style="display:none;" onclick="showTab('somo',this)"><span class="nav-icon">📦</span><span>소모품 관리</span></div>
   <div class="nav-item admin-only-nav" style="display:none;" onclick="showTab('vendor',this)"><span class="nav-icon">🏢</span><span>업체 관리</span></div>
@@ -199,8 +199,7 @@ textarea.form-control { resize: vertical; min-height: 70px; }
     <div class="role-label">접속 역할</div>
     <select class="role-select" id="roleSelect" onchange="changeRole(this.value)">
       <option value="user">신청자</option>
-      <option value="approver">담당자</option>
-      <option value="admin">관리자</option>
+      <option value="manager">담당자</option>
     </select>
   </div>
 </nav>
@@ -1502,7 +1501,7 @@ function renderHistoryHeader(cat) {
   var thead = document.querySelector('#historyTable thead tr');
   if (!thead) return;
   var headers = CAT_HEADERS[cat] || CAT_HEADERS[''];
-  var canEdit = (currentRole === 'approver' || currentRole === 'admin');
+  var canEdit = (currentRole === 'manager');
   var selectTh = canEdit ? '<th><input type="checkbox" id="checkAll" onchange="toggleCheckAll(this)"></th>' : '<th></th>';
   thead.innerHTML = selectTh + headers.map(function(h){ return '<th>' + h + '</th>'; }).join('') + (canEdit ? '<th></th>' : '');
 }
@@ -1524,7 +1523,7 @@ function renderHistoryPage(cat) {
   var end   = Math.min(start + PAGE_SIZE, filteredRecords.length);
   var pageData = filteredRecords.slice(start, end);
 
-  var canEdit = (currentRole === 'approver' || currentRole === 'admin');
+  var canEdit = (currentRole === 'manager');
 
   if (pageData.length === 0) {
     tbody.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:24px;color:#999;">조회된 데이터가 없습니다</td></tr>';
@@ -1865,25 +1864,38 @@ function addApprover() {
 }
 
 // ── 역할 변경 ────────────────────────────────────────────
+// 역할은 '신청자(user)' / '담당자(manager)' 2단계로 통합 운영.
+// 담당자는 기존 담당자+관리자 권한을 모두 포함합니다.
 var currentRole = 'user';
 function changeRole(role) {
   currentRole = role;
 
-  // 관리 메뉴 표시/숨김
+  // 관리 메뉴(소모품 관리/업체 관리/관리자 설정) 표시/숨김: 담당자에게 통합 표시
   var adminMenus = document.querySelectorAll('.admin-only-nav');
   adminMenus.forEach(function(el){
-    el.style.display = (role === 'admin') ? '' : 'none';
+    el.style.display = (role === 'manager') ? '' : 'none';
   });
 
-  // 신청자: 승인 대기함 숨김 / 담당자·관리자: 표시
+  // 신청자: 승인 대기함 / 대시보드 메뉴 숨김 / 담당자: 표시
   var navApprove = document.getElementById('navApprove');
   if (navApprove) navApprove.style.display = (role === 'user') ? 'none' : '';
+  var navDashboard = document.getElementById('navDashboard');
+  if (navDashboard) navDashboard.style.display = (role === 'user') ? 'none' : '';
+
+  // 신청자가 승인 대기함/대시보드 탭을 보고 있던 상태에서 역할이 바뀌면 발주 신청 탭으로 이동
+  if (role === 'user') {
+    var approveTab = document.getElementById('tab-approve');
+    var dashboardTab = document.getElementById('tab-dashboard');
+    if ((approveTab && approveTab.classList.contains('active')) || (dashboardTab && dashboardTab.classList.contains('active'))) {
+      showTab('order', null);
+    }
+  }
 
   // 발주 현황 상태 컬럼 & 담당자 버튼: 역할에 따라 제어 후 재렌더링
   renderStatusTab();
 
   // 담당자일 때 구매이력 기본값: 2026년 + 소모품비
-  if (role === 'approver') {
+  if (role === 'manager') {
     var fy = document.getElementById('filterYear');
     var fc = document.getElementById('filterCat');
     if (fy) fy.value = '2026';
@@ -1898,9 +1910,9 @@ function changeRole(role) {
 
   // 구매 이력 행 추가 버튼 표시/숨김
   var addBtn = document.getElementById('histAddRowBtn');
-  if (addBtn) addBtn.style.display = (role === 'approver' || role === 'admin') ? '' : 'none';
+  if (addBtn) addBtn.style.display = (role === 'manager') ? '' : 'none';
 
-  showToast(role === 'admin' ? '관리자 모드' : role === 'approver' ? '담당자 모드' : '신청자 모드');
+  showToast(role === 'manager' ? '담당자 모드' : '신청자 모드');
 }
 
 // ── 유틸 ────────────────────────────────────────────────
@@ -2020,7 +2032,7 @@ function renderStatusTab() {
   var tbody = document.getElementById('myStatusTbody');
   if (!tbody) return;
   var list = myOrders;
-  var canEdit = (currentRole === 'approver' || currentRole === 'admin');
+  var canEdit = (currentRole === 'manager');
 
   // 삭제 관련 컬럼 헤더 표시/숨김
   document.querySelectorAll('.status-del-col-header').forEach(function(el){
